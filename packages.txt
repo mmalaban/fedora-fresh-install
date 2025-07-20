@@ -1,0 +1,7 @@
+git
+fastfetch
+neovim
+xclip
+btop
+docker
+gparted
