@@ -438,7 +438,14 @@ write_fastfetch_config() {
         return 0
     fi
     
-    cat > "$config_path" << 'EOF'
+    log_info "Writing fastfetch configuration to: $config_path"
+    
+    # Ensure directory exists
+    local config_dir=$(dirname "$config_path")
+    mkdir -p "$config_dir"
+    
+    # Write configuration with error checking
+    if cat > "$config_path" << 'EOF'
 {
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
     "logo": {
@@ -546,6 +553,12 @@ write_fastfetch_config() {
     ]
 }
 EOF
+    then
+        return 0
+    else
+        log_error "Failed to write fastfetch configuration"
+        return 1
+    fi
 }
 
 # Create fastfetch configuration
@@ -563,9 +576,7 @@ create_fastfetch_config() {
         return 0
     fi
     
-    write_fastfetch_config "$config_path"
-    
-    if [[ $? -eq 0 ]]; then
+    if write_fastfetch_config "$config_path"; then
         log_success "Fastfetch configuration created: $config_path"
     else
         log_error "Failed to create fastfetch configuration"
@@ -599,7 +610,14 @@ write_oh_my_posh_config() {
         return 0
     fi
     
-    cat > "$config_path" << 'EOF'
+    log_info "Writing Oh My Posh configuration to: $config_path"
+    
+    # Ensure directory exists
+    local config_dir=$(dirname "$config_path")
+    mkdir -p "$config_dir"
+    
+    # Write configuration with error checking
+    if cat > "$config_path" << 'EOF'
 {
   "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
   "palette": {
@@ -691,6 +709,12 @@ write_oh_my_posh_config() {
   "version": 3
 }
 EOF
+    then
+        return 0
+    else
+        log_error "Failed to write Oh My Posh configuration"
+        return 1
+    fi
 }
 
 # Create Oh My Posh configuration
@@ -708,9 +732,7 @@ create_oh_my_posh_config() {
         return 0
     fi
     
-    write_oh_my_posh_config "$config_path"
-    
-    if [[ $? -eq 0 ]]; then
+    if write_oh_my_posh_config "$config_path"; then
         log_success "Oh My Posh configuration created: $config_path"
     else
         log_error "Failed to create Oh My Posh configuration"
@@ -762,6 +784,8 @@ display_summary() {
         echo "  ✓ Directories created: $TMP_DIR, $BASHRC_DIR, $FASTFETCH_CONFIG_DIR, $OH_MY_POSH_CONFIG_DIR, $FONT_DIR"
         echo "  ✓ Repository cloned and files copied to $BASHRC_DIR"
         echo "  ✓ Meslo Nerd Font downloaded and installed"
+        echo "  ✓ Fastfetch configuration created"
+        echo "  ✓ Oh My Posh installed and configured"
         echo "  ✓ Temporary files cleaned up"
         echo
         log_info "Please restart your terminal or source your shell configuration to apply changes."
