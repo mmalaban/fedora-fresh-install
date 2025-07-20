@@ -23,9 +23,11 @@ FASTFETCH_CONFIG_FILE="12.jsonc"
 OH_MY_POSH_CONFIG_DIR=".config/oh-my-posh"
 OH_MY_POSH_CONFIG_FILE="catppuccin_macchiato.omp.json"
 FONT_DIR="$HOME/.local/share/fonts"
+OH_MY_POSH_INSTALL_DIR="$HOME/.local/bin"
 
-# Global dry-run flag
+# Global flags
 DRY_RUN=false
+UNINSTALL=false
 
 # Logging functions
 log_info() {
@@ -740,8 +742,158 @@ create_oh_my_posh_config() {
     fi
 }
 
+# Remove file or directory safely
+remove_item() {
+    local item="$1"
+    local description="$2"
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        if [[ -e "$item" ]]; then
+            log_dry_run "Would remove $description: $item"
+        else
+            log_dry_run "$description does not exist: $item"
+        fi
+        return 0
+    fi
+    
+    if [[ -e "$item" ]]; then
+        if rm -rf "$item"; then
+            log_success "Removed $description: $item"
+        else
+            log_warning "Failed to remove $description: $item"
+        fi
+    else
+        log_info "$description does not exist: $item"
+    fi
+}
+
+# Remove Meslo Nerd Fonts
+remove_fonts() {
+    log_info "Removing Meslo Nerd Fonts..."
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_dry_run "Would search for and remove Meslo font files in $FONT_DIR"
+        log_dry_run "Would execute: fc-cache -fv $FONT_DIR"
+        return 0
+    fi
+    
+    # Find and remove Meslo font files
+    local font_count=0
+    if [[ -d "$FONT_DIR" ]]; then
+        while IFS= read -r -d '' font_file; do
+            if [[ -f "$font_file" ]]; then
+                local filename=$(basename "$font_file")
+                if rm "$font_file"; then
+                    log_success "Removed font: $filename"
+                    ((font_count++))
+                else
+                    log_warning "Failed to remove font: $filename"
+                fi
+            fi
+        done < <(find "$FONT_DIR" -name "*Meslo*" -type f \( -name "*.ttf" -o -name "*.otf" \) -print0 2>/dev/null)
+        
+        if [[ $font_count -gt 0 ]]; then
+            log_success "Removed $font_count Meslo font files"
+            update_font_cache "$FONT_DIR"
+        else
+            log_info "No Meslo font files found to remove"
+        fi
+    else
+        log_info "Font directory does not exist: $FONT_DIR"
+    fi
+}
+
+# Remove Oh My Posh
+remove_oh_my_posh() {
+    log_info "Removing Oh My Posh..."
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_dry_run "Would remove Oh My Posh binary from $OH_MY_POSH_INSTALL_DIR/oh-my-posh"
+        log_dry_run "Would remove Oh My Posh themes directory: $HOME/.cache/oh-my-posh"
+        return 0
+    fi
+    
+    # Remove Oh My Posh binary
+    remove_item "$OH_MY_POSH_INSTALL_DIR/oh-my-posh" "Oh My Posh binary"
+    
+    # Remove Oh My Posh cache/themes
+    remove_item "$HOME/.cache/oh-my-posh" "Oh My Posh cache directory"
+}
+
+# Uninstall function
+uninstall() {
+    log_info "Starting uninstall process..."
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "Running uninstall in DRY-RUN mode..."
+        log_info "No actual changes will be made to your system"
+    fi
+    
+    # Remove configuration files
+    remove_item "$FASTFETCH_CONFIG_DIR/$FASTFETCH_CONFIG_FILE" "fastfetch configuration"
+    remove_item "$OH_MY_POSH_CONFIG_DIR/$OH_MY_POSH_CONFIG_FILE" "Oh My Posh configuration"
+    
+    # Remove directories if they're empty
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_dry_run "Would remove empty directories: $BASHRC_DIR, $FASTFETCH_CONFIG_DIR, $OH_MY_POSH_CONFIG_DIR"
+    else
+        # Only remove if empty
+        rmdir "$BASHRC_DIR" 2>/dev/null && log_success "Removed empty directory: $BASHRC_DIR" || log_info "Directory not empty or doesn't exist: $BASHRC_DIR"
+        rmdir "$FASTFETCH_CONFIG_DIR" 2>/dev/null && log_success "Removed empty directory: $FASTFETCH_CONFIG_DIR" || log_info "Directory not empty or doesn't exist: $FASTFETCH_CONFIG_DIR"
+        rmdir "$OH_MY_POSH_CONFIG_DIR" 2>/dev/null && log_success "Removed empty directory: $OH_MY_POSH_CONFIG_DIR" || log_info "Directory not empty or doesn't exist: $OH_MY_POSH_CONFIG_DIR"
+    fi
+    
+    # Remove bashrc files
+    if [[ -d "$BASHRC_DIR" ]]; then
+        remove_item "$BASHRC_DIR/*" "bashrc files"
+    fi
+    
+    # Remove fonts
+    remove_fonts
+    
+    # Remove Oh My Posh
+    remove_oh_my_posh
+    
+    # Clean up temporary files
+    remove_item "$TMP_DIR" "temporary directory"
+    
+    echo
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_success "Uninstall dry-run completed successfully!"
+        echo
+        echo "Summary of actions that WOULD be performed:"
+        echo "  ✓ Fastfetch configuration would be removed"
+        echo "  ✓ Oh My Posh configuration would be removed"
+        echo "  ✓ Empty directories would be removed"
+        echo "  ✓ Bashrc files would be removed"
+        echo "  ✓ Meslo Nerd Fonts would be removed"
+        echo "  ✓ Oh My Posh would be uninstalled"
+        echo "  ✓ Temporary files would be cleaned up"
+        echo
+        log_info "To actually perform the uninstall, run the script with --uninstall (without --dry-run)"
+    else
+        log_success "Uninstall completed successfully!"
+        echo
+        echo "Summary of actions performed:"
+        echo "  ✓ Fastfetch configuration removed"
+        echo "  ✓ Oh My Posh configuration removed"
+        echo "  ✓ Empty directories removed"
+        echo "  ✓ Bashrc files removed"
+        echo "  ✓ Meslo Nerd Fonts removed"
+        echo "  ✓ Oh My Posh uninstalled"
+        echo "  ✓ Temporary files cleaned up"
+        echo
+        log_warning "Note: Installed packages from packages.txt were NOT removed"
+        log_info "Please restart your terminal to see the changes take effect."
+    fi
+}
+
 # Cleanup function
 cleanup() {
+    if [[ "$UNINSTALL" == "true" ]]; then
+        return 0  # Skip cleanup during uninstall
+    fi
+    
     log_info "Cleaning up temporary files..."
     
     if [[ "$DRY_RUN" == "true" ]]; then
@@ -801,16 +953,27 @@ main() {
                 DRY_RUN=true
                 shift
                 ;;
+            --uninstall)
+                UNINSTALL=true
+                shift
+                ;;
             -h|--help)
                 echo "Usage: $0 [OPTIONS]"
                 echo ""
                 echo "Options:"
-                echo "  --dry-run    Show what would be done without executing"
-                echo "  -h, --help   Display this help message"
+                echo "  --dry-run     Show what would be done without executing"
+                echo "  --uninstall   Remove all installed configurations and files"
+                echo "  -h, --help    Display this help message"
                 echo ""
                 echo "Description:"
                 echo "  This script sets up a Fedora system with custom configurations."
                 echo "  It installs packages, downloads fonts, and configures fastfetch and Oh My Posh."
+                echo ""
+                echo "Examples:"
+                echo "  $0                    # Install everything"
+                echo "  $0 --dry-run          # Show what would be installed"
+                echo "  $0 --uninstall        # Remove everything"
+                echo "  $0 --uninstall --dry-run  # Show what would be removed"
                 exit 0
                 ;;
             *)
@@ -821,26 +984,31 @@ main() {
         esac
     done
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        log_info "Starting Fedora setup script in DRY-RUN mode..."
-        log_info "No actual changes will be made to your system"
+    # Execute based on mode
+    if [[ "$UNINSTALL" == "true" ]]; then
+        uninstall
     else
-        log_info "Starting Fedora setup script..."
+        if [[ "$DRY_RUN" == "true" ]]; then
+            log_info "Starting Fedora setup script in DRY-RUN mode..."
+            log_info "No actual changes will be made to your system"
+        else
+            log_info "Starting Fedora setup script..."
+        fi
+        
+        # Execute setup steps
+        check_sudo_privileges
+        update_system
+        install_packages
+        create_directories
+        clone_fedora_scripts
+        copy_repo_files
+        download_and_install_font
+        create_fastfetch_config
+        install_oh_my_posh
+        create_oh_my_posh_config
+        cleanup
+        display_summary
     fi
-    
-    # Execute setup steps
-    check_sudo_privileges
-    update_system
-    install_packages
-    create_directories
-    clone_fedora_scripts
-    copy_repo_files
-    download_and_install_font
-    create_fastfetch_config
-    install_oh_my_posh
-    create_oh_my_posh_config
-    cleanup
-    display_summary
 }
 
 # Trap to cleanup on script exit
